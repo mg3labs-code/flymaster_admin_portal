@@ -812,6 +812,46 @@ app.post("/api/auth/signup", async (req, res) => {
   }
 });
 
+app.post("/api/auth/telecaller-signup", async (req, res) => {
+  try {
+    const email = String(req.body.email || "").trim().toLowerCase();
+    const password = String(req.body.password || "");
+    const firstName = String(req.body.firstName || "").trim();
+    const lastName = String(req.body.lastName || "").trim();
+    const phone = String(req.body.phone || "").trim();
+    if (!email || password.length < 6) {
+      return res.status(400).json({ error: "Email and a password of at least 6 characters are required." });
+    }
+    if (!firstName || !lastName) {
+      return res.status(400).json({ error: "First name and last name are required." });
+    }
+    const existing = await pool.query("SELECT id FROM auth_users WHERE lower(email) = $1", [email]);
+    if (existing.rows[0]) {
+      return res.status(400).json({ error: "An account with this email already exists. Sign in instead." });
+    }
+    const id = `user-${crypto.randomUUID()}`;
+    await pool.query(
+      "INSERT INTO auth_users (id, email, password, user_metadata) VALUES ($1,$2,$3,$4::jsonb)",
+      [id, email, hashPassword(password), JSON.stringify({ first_name: firstName, last_name: lastName })],
+    );
+    await jsonUpsert("user_roles", { id: `role-${id}`, user_id: id, role: "telecaller" });
+    await jsonUpsert("profiles", {
+      id: `profile-${id}`,
+      user_id: id,
+      first_name: firstName,
+      last_name: lastName,
+      phone,
+      country: "India",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    const user = publicUser({ id, email, first_name: firstName, last_name: lastName, phone }, "telecaller");
+    res.json({ token: signUser(user), user });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not create account" });
+  }
+});
+
 app.post("/api/auth/signin", async (req, res) => {
   try {
     const email = String(req.body.email || "").trim().toLowerCase();

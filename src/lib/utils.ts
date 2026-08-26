@@ -76,3 +76,24 @@ export function personName(
   const found = people.find((row) => row.user_id === id || row.id === id);
   return found ? displayName(found.first_name, found.last_name, found.email || "Student") : "Student";
 }
+
+/**
+ * A counselor is referenced by either its own id or its auth_user_id, depending on
+ * whether the row came from counselor_users or from the auth/roles tables.
+ */
+export function counselorOwns(
+  counselor: { id: string; auth_user_id?: string | null },
+  counselorId?: string | null,
+) {
+  if (!counselorId) return false;
+  return counselorId === counselor.id || (counselor.auth_user_id ? counselorId === counselor.auth_user_id : false);
+}
+
+/**
+ * Documents, applications, shortlists and conversations key off a student id that may
+ * be either the lead's user_id or the lead's own id. Always check both.
+ */
+export function studentOwns(student: { id: string; user_id?: string }, ownerId?: string | null) {
+  if (!ownerId) return false;
+  return ownerId === student.user_id || ownerId === student.id;
+}
